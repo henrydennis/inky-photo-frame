@@ -8,6 +8,7 @@ User=pi
 WorkingDirectory=/home/pi/inky-photo-frame
 Environment=PATH=/home/pi/inky-photo-frame/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStartPre=/bin/mkdir -p /home/pi/inky-photo-frame/static
+ExecStartPre=/bin/touch /home/pi/inky-photo-frame/inky_frame.log
 ExecStartPre=/bin/chown -R pi:pi /home/pi/inky-photo-frame
 ExecStart=/home/pi/inky-photo-frame/venv/bin/python app.py
 Restart=always
