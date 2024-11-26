@@ -21,8 +21,8 @@ A web-based photo frame manager for the Pimoroni Inky Impression e-ink display.
 
 1. Clone this repository:
 ```bash
-git clone [your-repo-url]
-cd photoframe
+git clone https://github.com/henrydennis/inky-photo-frame.git
+cd inky-photo-frame
 ```
 
 2. Install the required packages:
