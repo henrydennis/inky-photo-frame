@@ -8,17 +8,24 @@ import random
 import shutil
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'photos'
+app.config['UPLOAD_FOLDER'] = os.path.abspath('photos')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs('static/photos', exist_ok=True)
 
-# Create symlink if it doesn't exist
-photos_symlink = os.path.join('static', 'photos')
-if not os.path.exists(photos_symlink):
-    os.symlink(os.path.abspath(app.config['UPLOAD_FOLDER']), photos_symlink)
+# Handle static photos directory
+static_photos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'photos')
+os.makedirs(os.path.dirname(static_photos_dir), exist_ok=True)
+
+# Remove existing symlink if it exists
+if os.path.islink(static_photos_dir):
+    os.unlink(static_photos_dir)
+elif os.path.exists(static_photos_dir):
+    shutil.rmtree(static_photos_dir)
+
+# Create new symlink
+os.symlink(app.config['UPLOAD_FOLDER'], static_photos_dir)
 
 # Initialize the Inky display
 try:
