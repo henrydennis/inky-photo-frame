@@ -1,10 +1,11 @@
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for, send_from_directory
 from inky.auto import auto
 from PIL import Image
 import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 import random
+import shutil
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'photos'
@@ -12,6 +13,12 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs('static/photos', exist_ok=True)
+
+# Create symlink if it doesn't exist
+photos_symlink = os.path.join('static', 'photos')
+if not os.path.exists(photos_symlink):
+    os.symlink(os.path.abspath(app.config['UPLOAD_FOLDER']), photos_symlink)
 
 # Initialize the Inky display
 try:
