@@ -16,16 +16,28 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Handle static photos directory
 static_photos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'photos')
-os.makedirs(os.path.dirname(static_photos_dir), exist_ok=True)
 
-# Remove existing symlink if it exists
-if os.path.islink(static_photos_dir):
-    os.unlink(static_photos_dir)
-elif os.path.exists(static_photos_dir):
-    shutil.rmtree(static_photos_dir)
+try:
+    # Remove existing symlink or directory if it exists
+    if os.path.islink(static_photos_dir):
+        os.unlink(static_photos_dir)
+    elif os.path.exists(static_photos_dir):
+        shutil.rmtree(static_photos_dir)
 
-# Create new symlink
-os.symlink(app.config['UPLOAD_FOLDER'], static_photos_dir)
+    # Create new symlink
+    os.symlink(app.config['UPLOAD_FOLDER'], static_photos_dir)
+except Exception as e:
+    print(f"Warning: Could not create symlink: {e}")
+    # If symlink fails, try to create directory and copy files
+    try:
+        os.makedirs(static_photos_dir, exist_ok=True)
+        for file in os.listdir(app.config['UPLOAD_FOLDER']):
+            src = os.path.join(app.config['UPLOAD_FOLDER'], file)
+            dst = os.path.join(static_photos_dir, file)
+            if os.path.isfile(src):
+                shutil.copy2(src, dst)
+    except Exception as e:
+        print(f"Error setting up static photos directory: {e}")
 
 # Initialize the Inky display
 try:
@@ -102,7 +114,17 @@ def upload():
     
     if file and file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
         filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        # Also copy to static directory if symlink failed
+        static_file_path = os.path.join(static_photos_dir, filename)
+        try:
+            if not os.path.islink(static_photos_dir):
+                shutil.copy2(file_path, static_file_path)
+        except Exception as e:
+            print(f"Error copying to static directory: {e}")
+            
         update_display()  # Update display with new image
     
     return redirect(url_for('index'))
