@@ -1,0 +1,15 @@
+[Unit]
+Description=Inky Photo Frame Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/inky-photo-frame
+Environment=PATH=/home/pi/inky-photo-frame/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/pi/inky-photo-frame/venv/bin/python app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 

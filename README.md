@@ -22,7 +22,9 @@ A web-based photo frame manager for the Pimoroni Inky Impression e-ink display.
 1. Install system dependencies:
 ```bash
 sudo apt update
-sudo apt install python3-venv python3-full git
+sudo apt install python3-venv python3-full git \
+                 libopenblas0 python3-numpy \
+                 libatlas-base-dev
 ```
 
 2. Clone this repository:
@@ -49,7 +51,35 @@ python app.py
 
 The web interface will be available at `http://[your-pi-ip]:5000`
 
-To have the application start automatically on boot, you can create a systemd service.
+## Setting up Autostart
+
+To have the application start automatically on boot:
+
+1. Copy the service file to systemd:
+```bash
+sudo cp inky-photo-frame.service /etc/systemd/system/
+```
+
+2. Reload systemd and enable the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable inky-photo-frame
+```
+
+3. Start the service:
+```bash
+sudo systemctl start inky-photo-frame
+```
+
+4. Check the status:
+```bash
+sudo systemctl status inky-photo-frame
+```
+
+To view the application logs:
+```bash
+sudo journalctl -u inky-photo-frame -f
+```
 
 ## Usage
 
@@ -64,7 +94,7 @@ To have the application start automatically on boot, you can create a systemd se
 - Images are automatically resized to fit the display while maintaining aspect ratio
 - Uploaded photos are stored in the `photos` directory
 - The application creates a white background for images that don't fill the entire display
-- Always activate the virtual environment (`source venv/bin/activate`) before running the application
+- Always activate the virtual environment (`source venv/bin/activate`) before running the application manually
 
 ## Troubleshooting
 
@@ -72,6 +102,7 @@ If you encounter any issues:
 
 1. Check that the Inky display is properly connected
 2. Ensure you have the correct permissions to access the display
-3. Check the application logs for any error messages
+3. Check the application logs with: `sudo journalctl -u inky-photo-frame -f`
 4. Make sure the photos directory is writable
 5. If you get "externally-managed-environment" errors, make sure you've created and activated the virtual environment as described in the installation steps
+6. If you see NumPy-related errors about missing libraries, ensure you've installed all system dependencies from step 1
