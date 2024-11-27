@@ -127,6 +127,13 @@ def schedule_update():
     except Exception as e:
         logger.error(f"Error in scheduled update: {e}\n{traceback.format_exc()}")
 
+# Global orientation state
+ORIENTATION_0 = "0"    # Normal
+ORIENTATION_90 = "90"  # Rotated right
+ORIENTATION_180 = "180"  # Upside down
+ORIENTATION_270 = "270"  # Rotated left
+current_orientation = ORIENTATION_0
+
 # Constants for settings
 SETTINGS_FILE = 'settings.json'
 DEFAULT_SETTINGS = {
@@ -204,13 +211,6 @@ BUTTON_D = 24
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup([BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D], GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# Global orientation state
-ORIENTATION_0 = "0"    # Normal
-ORIENTATION_90 = "90"  # Rotated right
-ORIENTATION_180 = "180"  # Upside down
-ORIENTATION_270 = "270"  # Rotated left
-current_orientation = ORIENTATION_0
 
 def handle_button(channel):
     """Handle button presses for orientation changes"""
