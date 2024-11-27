@@ -43,11 +43,34 @@
         }
         .photo-item {
             text-align: center;
+            position: relative;
         }
         .photo-item img {
             max-width: 100%;
             height: auto;
             border-radius: 4px;
+            transition: opacity 0.2s;
+        }
+        .photo-item.selected img {
+            opacity: 0.7;
+        }
+        .photo-checkbox {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            z-index: 1;
+        }
+        .bulk-actions {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            display: none;
+        }
+        .bulk-actions.visible {
+            display: block;
         }
         .button {
             background-color: #4CAF50;
@@ -62,8 +85,48 @@
         .button:hover {
             background-color: #45a049;
         }
+        .button.delete {
+            background-color: #dc3545;
+        }
+        .button.delete:hover {
+            background-color: #c82333;
+        }
         input[type="file"] {
             margin: 10px 0;
+        }
+        .upload-preview {
+            margin-top: 10px;
+            display: none;
+        }
+        .preview-count {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .file-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background: #fff;
+        }
+        .upload-progress {
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
@@ -72,11 +135,20 @@
         <h1>Inky Photo Frame Manager</h1>
         
         <div class="upload-section">
-            <h2>Upload New Photo</h2>
-            <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-                <input type="file" name="photo" accept=".jpg,.jpeg,.png" required>
+            <h2>Upload Photos</h2>
+            <form id="uploadForm" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+                <input type="file" name="photos" accept=".jpg,.jpeg,.png" multiple required onchange="previewFiles(this)">
                 <br>
-                <button type="submit" class="button">Upload Photo</button>
+                <div class="upload-preview" id="uploadPreview">
+                    <div class="preview-count" id="previewCount"></div>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+                <div class="upload-progress" id="uploadProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+                <button type="submit" class="button" onclick="handleUpload(event)">Upload Photos</button>
             </form>
         </div>
 
@@ -86,12 +158,20 @@
             </form>
         </div>
 
+        <div class="bulk-actions" id="bulkActions">
+            <form id="bulkForm" method="post">
+                <button type="button" class="button delete" onclick="submitBulkAction('delete')">Delete Selected</button>
+                <button type="button" class="button" onclick="submitBulkAction('display')">Display Selected</button>
+            </form>
+        </div>
+
         <div class="photo-list">
             <h2>Uploaded Photos</h2>
             {% if photos %}
             <div class="photo-grid">
                 {% for photo in photos %}
                 <div class="photo-item">
+                    <input type="checkbox" class="photo-checkbox" data-filename="{{ photo }}" onclick="updateBulkActions()">
                     <img src="{{ url_for('static', filename='photos/' + photo) }}" alt="{{ photo }}">
                     <p>{{ photo }}</p>
                 </div>
@@ -102,5 +182,102 @@
             {% endif %}
         </div>
     </div>
+
+    <script>
+        function updateBulkActions() {
+            const checkboxes = document.querySelectorAll('.photo-checkbox:checked');
+            const bulkActions = document.getElementById('bulkActions');
+            const photoItems = document.querySelectorAll('.photo-item');
+            
+            photoItems.forEach(item => {
+                const checkbox = item.querySelector('.photo-checkbox');
+                if (checkbox.checked) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+
+            if (checkboxes.length > 0) {
+                bulkActions.classList.add('visible');
+            } else {
+                bulkActions.classList.remove('visible');
+            }
+        }
+
+        function submitBulkAction(action) {
+            const form = document.getElementById('bulkForm');
+            const checkboxes = document.querySelectorAll('.photo-checkbox:checked');
+            const selectedFiles = Array.from(checkboxes).map(cb => cb.dataset.filename);
+            
+            if (selectedFiles.length === 0) return;
+
+            form.action = action === 'delete' ? '/bulk_delete' : '/bulk_display';
+            
+            // Clear any existing hidden inputs
+            form.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
+            
+            // Add selected files as hidden inputs
+            selectedFiles.forEach(filename => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_files';
+                input.value = filename;
+                form.appendChild(input);
+            });
+            
+            form.submit();
+        }
+
+        function previewFiles(input) {
+            const preview = document.getElementById('uploadPreview');
+            const fileList = document.getElementById('fileList');
+            const previewCount = document.getElementById('previewCount');
+            
+            if (input.files.length > 0) {
+                preview.style.display = 'block';
+                previewCount.textContent = `Selected ${input.files.length} file${input.files.length === 1 ? '' : 's'}`;
+                
+                fileList.innerHTML = '';
+                Array.from(input.files).forEach(file => {
+                    fileList.innerHTML += `<div>${file.name}</div>`;
+                });
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function handleUpload(event) {
+            event.preventDefault();
+            
+            const form = document.getElementById('uploadForm');
+            const progress = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const formData = new FormData(form);
+            
+            progress.style.display = 'block';
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+                return response.text();
+            })
+            .then(() => {
+                progressFill.style.width = '100%';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Upload failed. Please try again.');
+            });
+        }
+    </script>
 </body>
 </html> 
