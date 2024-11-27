@@ -145,12 +145,41 @@
             display: none;
             margin: 10px 0;
         }
+        .current-photo-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .current-photo-section img {
+            max-width: 100%;
+            max-height: 400px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .current-photo-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Inky Photo Frame Manager</h1>
         
+        <!-- Current Photo Section -->
+        <div class="current-photo-section">
+            <h2>Currently Displaying</h2>
+            {% if current_photo %}
+                <img src="{{ url_for('static', filename='photos/' + current_photo) }}" alt="Current photo">
+                <p>{{ current_photo }}</p>
+            {% else %}
+                <p>No photo currently displayed</p>
+            {% endif %}
+        </div>
+
         <div class="upload-section">
             <h2>Upload Photos</h2>
             <p class="upload-info">Images will be automatically resized to fit the frame (600x448 pixels)</p>
@@ -326,4 +355,4 @@
         }
     </script>
 </body>
-</html> 
+</html>

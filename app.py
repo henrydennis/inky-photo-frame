@@ -90,6 +90,7 @@ def get_random_image():
 
 def update_display():
     """Update the Inky display with a random image"""
+    global current_photo
     logger.info("Starting display update process")
     
     if not display:
@@ -118,6 +119,8 @@ def update_display():
         logger.info(f"Successfully updated display with image: {os.path.basename(image_path)}")
     except Exception as e:
         logger.error(f"Error updating display: {e}\n{traceback.format_exc()}")
+    
+    current_photo = os.path.basename(image_path)
 
 def schedule_update():
     """Wrapper for scheduler to catch and log any errors"""
@@ -127,7 +130,8 @@ def schedule_update():
     except Exception as e:
         logger.error(f"Error in scheduled update: {e}\n{traceback.format_exc()}")
 
-# Global orientation state
+# Global variables
+current_photo = None
 ORIENTATION_0 = "0"    # Normal
 ORIENTATION_90 = "90"  # Rotated right
 ORIENTATION_180 = "180"  # Upside down
@@ -328,11 +332,12 @@ def prepare_for_display(image, orientation):
 
 @app.route('/')
 def index():
-    """Display the upload form and list of images"""
-    photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
-             if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    logger.info(f"Index page requested, found {len(photos)} photos")
-    return render_template('index.html', photos=photos, current_orientation=current_orientation)
+    photos = []
+    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            photos.append(filename)
+    photos.sort()
+    return render_template('index.html', photos=photos, current_photo=current_photo, current_orientation=current_orientation)
 
 @app.route('/set_orientation', methods=['POST'])
 def set_orientation():
