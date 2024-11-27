@@ -104,38 +104,22 @@ def update_display():
         logger.info(f"Opening image: {image_path}")
         image = Image.open(image_path)
         
-        # Log original image size
-        logger.info(f"Original image size: {image.size}")
+        # Convert to RGB if necessary
+        if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            if image.mode == 'P':
+                image = image.convert('RGBA')
+            background.paste(image, mask=image.split()[-1])
+            image = background
+        elif image.mode != 'RGB':
+            image = image.convert('RGB')
         
-        # Calculate scaling ratios
-        width_ratio = display.width / image.width
-        height_ratio = display.height / image.height
-        
-        # Use the larger ratio to ensure the image fills the frame
-        scale_ratio = max(width_ratio, height_ratio)
-        
-        # Calculate new dimensions
-        new_width = int(image.width * scale_ratio)
-        new_height = int(image.height * scale_ratio)
-        
-        # Resize the image
-        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        logger.info(f"Resized image size: {image.size}")
-        
-        # Create a new white image with the display's dimensions
-        new_image = Image.new("RGB", (display.width, display.height), (255, 255, 255))
-        
-        # Calculate position to center the image
-        x = (display.width - new_width) // 2
-        y = (display.height - new_height) // 2
-        logger.info(f"Centering image at position: ({x}, {y})")
-        
-        # Paste the resized image onto the white background
-        new_image.paste(image, (x, y))
+        # Fix orientation and compress
+        compressed_image = compress_image(image, display.width, display.height)
         
         # Show the image on the display
         logger.info("Setting image on display")
-        display.set_image(new_image)
+        display.set_image(compressed_image)
         logger.info("Showing image on display")
         display.show()
         
@@ -157,8 +141,41 @@ scheduler.add_job(schedule_update, 'interval', hours=1, next_run_time=datetime.n
 scheduler.start()
 logger.info("Scheduler started - images will update every hour")
 
+def fix_image_orientation(image):
+    """Fix image orientation based on EXIF data"""
+    try:
+        # Check if image has EXIF data
+        if hasattr(image, '_getexif') and image._getexif():
+            exif = dict(image._getexif().items())
+            
+            # EXIF orientation tag
+            orientation = exif.get(274)  # 274 is the orientation tag ID
+            
+            # Rotate or flip based on orientation
+            if orientation == 2:
+                return image.transpose(Image.FLIP_LEFT_RIGHT)
+            elif orientation == 3:
+                return image.transpose(Image.ROTATE_180)
+            elif orientation == 4:
+                return image.transpose(Image.FLIP_TOP_BOTTOM)
+            elif orientation == 5:
+                return image.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.ROTATE_90)
+            elif orientation == 6:
+                return image.transpose(Image.ROTATE_270)
+            elif orientation == 7:
+                return image.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.ROTATE_270)
+            elif orientation == 8:
+                return image.transpose(Image.ROTATE_90)
+    except Exception as e:
+        logger.warning(f"Error processing EXIF orientation: {e}")
+    
+    return image
+
 def compress_image(image, max_width, max_height):
     """Compress and resize image to target dimensions while maintaining aspect ratio"""
+    # Fix orientation first
+    image = fix_image_orientation(image)
+    
     # Calculate scaling ratios
     width_ratio = max_width / image.width
     height_ratio = max_height / image.height
@@ -298,30 +315,21 @@ def bulk_display():
             logger.info(f"Updating display with selected image: {selected_files[0]}")
             image = Image.open(image_path)
             
-            # Calculate scaling ratios
-            width_ratio = display.width / image.width
-            height_ratio = display.height / image.height
-            scale_ratio = max(width_ratio, height_ratio)
+            # Convert to RGB if necessary
+            if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1])
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
             
-            # Calculate new dimensions
-            new_width = int(image.width * scale_ratio)
-            new_height = int(image.height * scale_ratio)
-            
-            # Resize the image
-            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Create a new white image
-            new_image = Image.new("RGB", (display.width, display.height), (255, 255, 255))
-            
-            # Center the image
-            x = (display.width - new_width) // 2
-            y = (display.height - new_height) // 2
-            
-            # Paste the resized image
-            new_image.paste(image, (x, y))
+            # Fix orientation and compress
+            compressed_image = compress_image(image, display.width, display.height)
             
             # Update the display
-            display.set_image(new_image)
+            display.set_image(compressed_image)
             display.show()
             
             logger.info("Display updated successfully")
