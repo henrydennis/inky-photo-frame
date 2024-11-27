@@ -10,6 +10,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import traceback
 import RPi.GPIO as GPIO
+import json
 
 # Set up logging
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -126,8 +127,41 @@ def schedule_update():
     except Exception as e:
         logger.error(f"Error in scheduled update: {e}\n{traceback.format_exc()}")
 
+# Constants for settings
+SETTINGS_FILE = 'settings.json'
+DEFAULT_SETTINGS = {
+    'orientation': ORIENTATION_0
+}
+
+def load_settings():
+    """Load settings from file, creating default if doesn't exist"""
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            settings = json.load(f)
+            logger.info(f"Settings loaded: {settings}")
+            return settings
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.warning(f"Could not load settings ({e}), using defaults")
+        save_settings(DEFAULT_SETTINGS)
+        return DEFAULT_SETTINGS
+
+def save_settings(settings):
+    """Save settings to file"""
+    try:
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f)
+        logger.info(f"Settings saved: {settings}")
+    except Exception as e:
+        logger.error(f"Could not save settings: {e}")
+
 # Initialize the scheduler
 scheduler = BackgroundScheduler()
+
+# Load saved settings
+settings = load_settings()
+current_orientation = settings.get('orientation', ORIENTATION_0)
+logger.info(f"Loaded orientation setting: {current_orientation}")
+
 scheduler.add_job(schedule_update, 'interval', hours=1, next_run_time=datetime.now())  # Run immediately and then every hour
 scheduler.start()
 logger.info("Scheduler started - images will update every hour")
@@ -192,6 +226,9 @@ def handle_button(channel):
                 current_orientation = ORIENTATION_180
             elif channel == BUTTON_D:
                 current_orientation = ORIENTATION_270
+            
+            # Save the new orientation
+            save_settings({'orientation': current_orientation})
             
             logger.info(f"Orientation changed to: {current_orientation}°")
             update_display()  # Update the display with new orientation
