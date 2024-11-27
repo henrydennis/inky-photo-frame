@@ -8,6 +8,7 @@ import random
 import shutil
 import logging
 from logging.handlers import RotatingFileHandler
+import traceback
 
 # Set up logging
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -66,62 +67,85 @@ except Exception as e:
 # Initialize the Inky display
 try:
     display = auto()
-    logger.info("Successfully initialized Inky display")
+    logger.info(f"Successfully initialized Inky display: {display.width}x{display.height}")
 except Exception as e:
-    logger.warning(f"Could not initialize Inky display: {e}")
+    logger.error(f"Could not initialize Inky display: {e}\n{traceback.format_exc()}")
     display = None
 
 def get_random_image():
     """Get a random image from the photos directory"""
-    photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
-             if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    if photos:
-        chosen_photo = random.choice(photos)
-        logger.debug(f"Selected random photo: {chosen_photo}")
-        return os.path.join(app.config['UPLOAD_FOLDER'], chosen_photo)
-    logger.warning("No photos available to display")
-    return None
+    try:
+        photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
+                if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        logger.info(f"Found {len(photos)} photos in directory")
+        if photos:
+            chosen_photo = random.choice(photos)
+            logger.info(f"Selected random photo: {chosen_photo}")
+            return os.path.join(app.config['UPLOAD_FOLDER'], chosen_photo)
+        logger.warning("No photos available to display")
+        return None
+    except Exception as e:
+        logger.error(f"Error in get_random_image: {e}\n{traceback.format_exc()}")
+        return None
 
 def update_display():
     """Update the Inky display with a random image"""
+    logger.info("Starting display update process")
+    
     if not display:
-        logger.warning("Display not initialized, skipping update")
+        logger.error("Display not initialized, skipping update")
         return
 
     image_path = get_random_image()
     if not image_path:
-        logger.warning("No images available for display update")
+        logger.error("No images available for display update")
         return
 
     try:
         # Open the image
+        logger.info(f"Opening image: {image_path}")
         image = Image.open(image_path)
-        logger.info(f"Updating display with image: {os.path.basename(image_path)}")
+        
+        # Log original image size
+        logger.info(f"Original image size: {image.size}")
         
         # Resize the image to fit the display while maintaining aspect ratio
         image.thumbnail((display.width, display.height))
+        logger.info(f"Resized image size: {image.size}")
         
         # Create a new white image with the display's dimensions
         new_image = Image.new("RGB", (display.width, display.height), (255, 255, 255))
+        logger.info(f"Created new image with size: {new_image.size}")
         
         # Calculate position to center the image
         x = (display.width - image.width) // 2
         y = (display.height - image.height) // 2
+        logger.info(f"Centering image at position: ({x}, {y})")
         
         # Paste the resized image onto the white background
         new_image.paste(image, (x, y))
         
         # Show the image on the display
+        logger.info("Setting image on display")
         display.set_image(new_image)
+        logger.info("Showing image on display")
         display.show()
         
         logger.info(f"Successfully updated display with image: {os.path.basename(image_path)}")
     except Exception as e:
-        logger.error(f"Error updating display: {e}")
+        logger.error(f"Error updating display: {e}\n{traceback.format_exc()}")
+
+def schedule_update():
+    """Wrapper for scheduler to catch and log any errors"""
+    try:
+        logger.info("Scheduled update triggered")
+        update_display()
+    except Exception as e:
+        logger.error(f"Error in scheduled update: {e}\n{traceback.format_exc()}")
 
 # Initialize the scheduler
 scheduler = BackgroundScheduler()
-scheduler.add_job(update_display, 'interval', hours=1)  # Change image every hour
+scheduler.add_job(schedule_update, 'interval', hours=1, next_run_time=datetime.now())  # Run immediately and then every hour
 scheduler.start()
 logger.info("Scheduler started - images will update every hour")
 
@@ -130,7 +154,7 @@ def index():
     """Display the upload form and list of images"""
     photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
              if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    logger.debug(f"Index page requested, found {len(photos)} photos")
+    logger.info(f"Index page requested, found {len(photos)} photos")
     return render_template('index.html', photos=photos)
 
 @app.route('/upload', methods=['POST'])
