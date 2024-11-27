@@ -128,6 +128,16 @@
             width: 0%;
             transition: width 0.3s ease;
         }
+        .upload-info {
+            color: #666;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+        .upload-error {
+            color: #dc3545;
+            display: none;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -136,6 +146,7 @@
         
         <div class="upload-section">
             <h2>Upload Photos</h2>
+            <p class="upload-info">Images will be automatically resized to fit the frame (600x448 pixels)</p>
             <form id="uploadForm" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
                 <input type="file" name="photos" accept=".jpg,.jpeg,.png" multiple required onchange="previewFiles(this)">
                 <br>
@@ -148,6 +159,7 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                 </div>
+                <div class="upload-error" id="uploadError"></div>
                 <button type="submit" class="button" onclick="handleUpload(event)">Upload Photos</button>
             </form>
         </div>
@@ -253,9 +265,15 @@
             const form = document.getElementById('uploadForm');
             const progress = document.getElementById('uploadProgress');
             const progressFill = document.getElementById('progressFill');
+            const errorDiv = document.getElementById('uploadError');
+            const submitButton = event.target;
             const formData = new FormData(form);
             
+            // Reset UI
             progress.style.display = 'block';
+            progressFill.style.width = '0%';
+            errorDiv.style.display = 'none';
+            submitButton.disabled = true;
             
             fetch(form.action, {
                 method: 'POST',
@@ -275,7 +293,9 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Upload failed. Please try again.');
+                errorDiv.textContent = 'Upload failed. Please try again.';
+                errorDiv.style.display = 'block';
+                submitButton.disabled = false;
             });
         }
     </script>

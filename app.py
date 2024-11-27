@@ -27,8 +27,6 @@ logger.addHandler(console_handler)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.path.abspath('photos')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
 logger.info("Starting Inky Photo Frame application")
 
 # Ensure the upload folder exists
@@ -159,6 +157,32 @@ scheduler.add_job(schedule_update, 'interval', hours=1, next_run_time=datetime.n
 scheduler.start()
 logger.info("Scheduler started - images will update every hour")
 
+def compress_image(image, max_width, max_height):
+    """Compress and resize image to target dimensions while maintaining aspect ratio"""
+    # Calculate scaling ratios
+    width_ratio = max_width / image.width
+    height_ratio = max_height / image.height
+    scale_ratio = min(width_ratio, height_ratio)
+    
+    # Calculate new dimensions
+    new_width = int(image.width * scale_ratio)
+    new_height = int(image.height * scale_ratio)
+    
+    # Resize the image using high-quality Lanczos resampling
+    resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
+    # Create a new white background image
+    final_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
+    
+    # Calculate position to center the image
+    x = (max_width - new_width) // 2
+    y = (max_height - new_height) // 2
+    
+    # Paste the resized image onto the white background
+    final_image.paste(resized_image, (x, y))
+    
+    return final_image
+
 @app.route('/')
 def index():
     """Display the upload form and list of images"""
@@ -182,20 +206,44 @@ def upload():
     uploaded_files = []
     for file in files:
         if file and file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            logger.info(f"New photo uploaded: {filename}")
-            uploaded_files.append(filename)
-            
-            # Also copy to static directory if symlink failed
-            static_file_path = os.path.join(static_photos_dir, filename)
             try:
-                if not os.path.islink(static_photos_dir):
-                    shutil.copy2(file_path, static_file_path)
-                    logger.info(f"Copied photo to static directory: {filename}")
+                # Open and process the image
+                image = Image.open(file)
+                
+                # Convert to RGB if necessary (handles PNG with transparency)
+                if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+                    background = Image.new('RGB', image.size, (255, 255, 255))
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
+                    background.paste(image, mask=image.split()[-1])
+                    image = background
+                elif image.mode != 'RGB':
+                    image = image.convert('RGB')
+                
+                # Compress the image to frame dimensions
+                compressed_image = compress_image(image, display.width, display.height)
+                
+                # Generate filename and save path
+                filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                
+                # Save the compressed image with optimal quality
+                compressed_image.save(file_path, 'JPEG', quality=85, optimize=True)
+                logger.info(f"New photo uploaded and compressed: {filename}")
+                uploaded_files.append(filename)
+                
+                # Also copy to static directory if symlink failed
+                static_file_path = os.path.join(static_photos_dir, filename)
+                try:
+                    if not os.path.islink(static_photos_dir):
+                        shutil.copy2(file_path, static_file_path)
+                        logger.info(f"Copied photo to static directory: {filename}")
+                except Exception as e:
+                    logger.error(f"Error copying to static directory: {e}")
+                    
             except Exception as e:
-                logger.error(f"Error copying to static directory: {e}")
+                logger.error(f"Error processing image {file.filename}: {e}")
+                continue
         else:
             logger.warning(f"Upload rejected - invalid file type: {file.filename}")
     
