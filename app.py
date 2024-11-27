@@ -340,6 +340,38 @@ def bulk_display():
     
     return redirect(url_for('index'))
 
+@app.route('/delete_all_photos', methods=['POST'])
+def delete_all_photos():
+    """Delete all photos from the system"""
+    try:
+        # Get list of all photos
+        photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
+                if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        
+        logger.info(f"Attempting to delete all photos ({len(photos)} files)")
+        
+        # Delete each photo
+        for filename in photos:
+            try:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Deleted file: {filename}")
+                
+                # Also remove from static directory if it exists
+                static_file_path = os.path.join(static_photos_dir, filename)
+                if os.path.exists(static_file_path) and not os.path.islink(static_photos_dir):
+                    os.remove(static_file_path)
+                    logger.info(f"Deleted file from static directory: {filename}")
+            except Exception as e:
+                logger.error(f"Error deleting file {filename}: {e}")
+        
+        logger.info("All photos deleted successfully")
+    except Exception as e:
+        logger.error(f"Error during bulk deletion: {e}")
+    
+    return redirect(url_for('index'))
+
 if __name__ == '__main__':
     logger.info("Starting Flask web server")
     app.run(host='0.0.0.0', port=5000) 
