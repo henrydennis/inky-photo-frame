@@ -332,7 +332,19 @@ def index():
     photos = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) 
              if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     logger.info(f"Index page requested, found {len(photos)} photos")
-    return render_template('index.html', photos=photos)
+    return render_template('index.html', photos=photos, current_orientation=current_orientation)
+
+@app.route('/set_orientation', methods=['POST'])
+def set_orientation():
+    """Handle orientation changes"""
+    global current_orientation
+    new_orientation = request.form.get('orientation')
+    if new_orientation in [ORIENTATION_0, ORIENTATION_90, ORIENTATION_180, ORIENTATION_270]:
+        current_orientation = new_orientation
+        save_settings({'orientation': current_orientation})
+        logger.info(f"Orientation changed to: {current_orientation}°")
+        update_display()  # Update the display with new orientation
+    return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])
 def upload():

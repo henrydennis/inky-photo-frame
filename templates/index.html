@@ -177,6 +177,18 @@
             </form>
         </div>
 
+        <div style="text-align: center; margin: 20px 0; padding: 20px; background-color: #f8f8f8; border-radius: 4px;">
+            <h3>Display Orientation</h3>
+            <form action="{{ url_for('set_orientation') }}" method="post" style="display: inline-block;">
+                <select name="orientation" onchange="this.form.submit()" style="padding: 8px; margin-right: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="0" {% if current_orientation == "0" %}selected{% endif %}>Normal (0°)</option>
+                    <option value="90" {% if current_orientation == "90" %}selected{% endif %}>Right (90°)</option>
+                    <option value="180" {% if current_orientation == "180" %}selected{% endif %}>Upside Down (180°)</option>
+                    <option value="270" {% if current_orientation == "270" %}selected{% endif %}>Left (270°)</option>
+                </select>
+            </form>
+        </div>
+
         <div class="bulk-actions" id="bulkActions">
             <form id="bulkForm" method="post">
                 <button type="button" class="button delete" onclick="submitBulkAction('delete')">Delete Selected</button>
