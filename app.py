@@ -1,5 +1,5 @@
 from flask import Flask, request, render_template, redirect, url_for, send_from_directory
-from inky.auto import auto
+from inky import Inky7Colour as Inky
 from PIL import Image
 import os
 from datetime import datetime
@@ -66,7 +66,7 @@ except Exception as e:
 
 # Initialize the Inky display
 try:
-    display = auto()
+    display = Inky(resolution=(640, 400))
     logger.info(f"Successfully initialized Inky display: {display.width}x{display.height}")
 except Exception as e:
     logger.error(f"Could not initialize Inky display: {e}\n{traceback.format_exc()}")

@@ -35,7 +35,7 @@ cd inky-photo-frame
 
 3. Create and activate a virtual environment:
 ```bash
-python3 -m venv venv
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 ```
 
