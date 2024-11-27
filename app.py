@@ -109,17 +109,27 @@ def update_display():
         # Log original image size
         logger.info(f"Original image size: {image.size}")
         
-        # Resize the image to fit the display while maintaining aspect ratio
-        image.thumbnail((display.width, display.height))
+        # Calculate scaling ratios
+        width_ratio = display.width / image.width
+        height_ratio = display.height / image.height
+        
+        # Use the larger ratio to ensure the image fills the frame
+        scale_ratio = max(width_ratio, height_ratio)
+        
+        # Calculate new dimensions
+        new_width = int(image.width * scale_ratio)
+        new_height = int(image.height * scale_ratio)
+        
+        # Resize the image
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         logger.info(f"Resized image size: {image.size}")
         
         # Create a new white image with the display's dimensions
         new_image = Image.new("RGB", (display.width, display.height), (255, 255, 255))
-        logger.info(f"Created new image with size: {new_image.size}")
         
         # Calculate position to center the image
-        x = (display.width - image.width) // 2
-        y = (display.height - image.height) // 2
+        x = (display.width - new_width) // 2
+        y = (display.height - new_height) // 2
         logger.info(f"Centering image at position: ({x}, {y})")
         
         # Paste the resized image onto the white background
