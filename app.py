@@ -246,7 +246,18 @@ def prepare_for_display(image, orientation):
     # Get the rotation angle and rotate if needed
     angle = rotations.get(orientation, 0)
     if angle != 0:
-        return image.rotate(angle, expand=True)
+        # For 90° and 270° rotations, we need to swap dimensions before rotating
+        if angle in [90, 270]:
+            # Create a new image with swapped dimensions
+            rotated = Image.new("RGB", (display.height, display.width), (255, 255, 255))
+            # Resize original image to fit the rotated dimensions
+            resized = image.resize((display.height, display.width))
+            # Paste and rotate
+            rotated.paste(resized)
+            return rotated.rotate(angle, expand=False)
+        else:
+            # For 180° rotation, maintain original dimensions
+            return image.rotate(angle, expand=False)
     return image
 
 @app.route('/')
