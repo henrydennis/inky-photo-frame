@@ -243,22 +243,36 @@ def prepare_for_display(image, orientation):
         ORIENTATION_270: 270
     }
     
+    # First ensure the image is the correct size for the display
+    target_width = display.width
+    target_height = display.height
+    
+    # Calculate scaling ratios
+    width_ratio = target_width / image.width
+    height_ratio = target_height / image.height
+    scale_ratio = min(width_ratio, height_ratio)
+    
+    # Calculate new dimensions
+    new_width = int(image.width * scale_ratio)
+    new_height = int(image.height * scale_ratio)
+    
+    # Create a white background image of the correct size
+    final_image = Image.new("RGB", (target_width, target_height), (255, 255, 255))
+    
+    # Resize the original image
+    resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
+    # Center the resized image
+    x = (target_width - new_width) // 2
+    y = (target_height - new_height) // 2
+    final_image.paste(resized_image, (x, y))
+    
     # Get the rotation angle and rotate if needed
     angle = rotations.get(orientation, 0)
     if angle != 0:
-        # For 90° and 270° rotations, we need to swap dimensions before rotating
-        if angle in [90, 270]:
-            # Create a new image with swapped dimensions
-            rotated = Image.new("RGB", (display.height, display.width), (255, 255, 255))
-            # Resize original image to fit the rotated dimensions
-            resized = image.resize((display.height, display.width))
-            # Paste and rotate
-            rotated.paste(resized)
-            return rotated.rotate(angle, expand=False)
-        else:
-            # For 180° rotation, maintain original dimensions
-            return image.rotate(angle, expand=False)
-    return image
+        return final_image.rotate(angle, expand=False)
+    
+    return final_image
 
 @app.route('/')
 def index():
