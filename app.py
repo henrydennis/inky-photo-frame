@@ -66,7 +66,7 @@ except Exception as e:
 
 # Initialize the Inky display
 try:
-    display = Inky(resolution=(640, 400))
+    display = Inky(resolution=(600, 448))
     logger.info(f"Successfully initialized Inky display: {display.width}x{display.height}")
 except Exception as e:
     logger.error(f"Could not initialize Inky display: {e}\n{traceback.format_exc()}")
