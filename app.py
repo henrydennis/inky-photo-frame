@@ -280,9 +280,13 @@ def prepare_for_display(image, orientation):
         ORIENTATION_270: 270
     }
     
-    # First ensure the image is the correct size for the display
-    target_width = display.width
-    target_height = display.height
+    # Determine target dimensions based on orientation
+    if orientation in [ORIENTATION_90, ORIENTATION_270]:
+        target_width = display.height
+        target_height = display.width
+    else:
+        target_width = display.width
+        target_height = display.height
     
     # Calculate scaling ratios
     width_ratio = target_width / image.width
@@ -293,8 +297,8 @@ def prepare_for_display(image, orientation):
     new_width = int(image.width * scale_ratio)
     new_height = int(image.height * scale_ratio)
     
-    # Create a white background image of the correct size
-    final_image = Image.new("RGB", (target_width, target_height), (255, 255, 255))
+    # Create a black background image of the correct size
+    final_image = Image.new("RGB", (target_width, target_height), (0, 0, 0))
     
     # Resize the original image
     resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -307,7 +311,18 @@ def prepare_for_display(image, orientation):
     # Get the rotation angle and rotate if needed
     angle = rotations.get(orientation, 0)
     if angle != 0:
-        return final_image.rotate(angle, expand=False)
+        # For 90 and 270 degree rotations, we need to rotate around the center and adjust the size
+        if orientation in [ORIENTATION_90, ORIENTATION_270]:
+            # Create a new image with swapped dimensions
+            rotated = Image.new("RGB", (display.width, display.height), (255, 255, 255))
+            # Rotate and paste into the center of the new image
+            rotated_content = final_image.rotate(angle, expand=True)
+            x = (display.width - rotated_content.width) // 2
+            y = (display.height - rotated_content.height) // 2
+            rotated.paste(rotated_content, (x, y))
+            return rotated
+        else:
+            return final_image.rotate(angle, expand=False)
     
     return final_image
 
