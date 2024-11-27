@@ -105,22 +105,12 @@ def update_display():
         logger.info(f"Opening image: {image_path}")
         image = Image.open(image_path)
         
-        # Convert to RGB if necessary
-        if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
-            background = Image.new('RGB', image.size, (255, 255, 255))
-            if image.mode == 'P':
-                image = image.convert('RGBA')
-            background.paste(image, mask=image.split()[-1])
-            image = background
-        elif image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Fix orientation and compress
-        compressed_image = compress_image(image, display.width, display.height)
+        # Prepare image for display with current orientation
+        display_image = prepare_for_display(image, current_orientation)
         
         # Show the image on the display
         logger.info("Setting image on display")
-        display.set_image(compressed_image)
+        display.set_image(display_image)
         logger.info("Showing image on display")
         display.show()
         
@@ -182,39 +172,43 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup([BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Global orientation state
-ORIENTATION_PORTRAIT = "portrait"
-ORIENTATION_LANDSCAPE = "landscape"
-current_orientation = ORIENTATION_PORTRAIT
+ORIENTATION_0 = "0"    # Normal
+ORIENTATION_90 = "90"  # Rotated right
+ORIENTATION_180 = "180"  # Upside down
+ORIENTATION_270 = "270"  # Rotated left
+current_orientation = ORIENTATION_0
 
 def handle_button(channel):
     """Handle button presses for orientation changes"""
     global current_orientation
     try:
-        if channel in [BUTTON_A, BUTTON_B]:  # Use A or B button to toggle orientation
-            if current_orientation == ORIENTATION_PORTRAIT:
-                current_orientation = ORIENTATION_LANDSCAPE
-            else:
-                current_orientation = ORIENTATION_PORTRAIT
-            logger.info(f"Orientation changed to: {current_orientation}")
+        if channel in [BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D]:
+            # Cycle through orientations based on button press
+            if channel == BUTTON_A:
+                current_orientation = ORIENTATION_0
+            elif channel == BUTTON_B:
+                current_orientation = ORIENTATION_90
+            elif channel == BUTTON_C:
+                current_orientation = ORIENTATION_180
+            elif channel == BUTTON_D:
+                current_orientation = ORIENTATION_270
+            
+            logger.info(f"Orientation changed to: {current_orientation}°")
             update_display()  # Update the display with new orientation
     except Exception as e:
         logger.error(f"Error handling button press: {e}")
 
-# Add button event detection
+# Update button event detection for all buttons
+GPIO.remove_event_detect(BUTTON_A)  # Remove existing detection first
+GPIO.remove_event_detect(BUTTON_B)
+GPIO.setup([BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.add_event_detect(BUTTON_A, GPIO.FALLING, callback=handle_button, bouncetime=250)
 GPIO.add_event_detect(BUTTON_B, GPIO.FALLING, callback=handle_button, bouncetime=250)
+GPIO.add_event_detect(BUTTON_C, GPIO.FALLING, callback=handle_button, bouncetime=250)
+GPIO.add_event_detect(BUTTON_D, GPIO.FALLING, callback=handle_button, bouncetime=250)
 
 def compress_image(image, max_width, max_height):
     """Compress and resize image to target dimensions while maintaining aspect ratio"""
-    global current_orientation
-    
-    # Fix orientation first
-    image = fix_image_orientation(image)
-    
-    # Swap dimensions if in landscape mode
-    if current_orientation == ORIENTATION_LANDSCAPE:
-        max_width, max_height = max_height, max_width
-    
     # Calculate scaling ratios
     width_ratio = max_width / image.width
     height_ratio = max_height / image.height
@@ -227,7 +221,7 @@ def compress_image(image, max_width, max_height):
     # Resize the image using high-quality Lanczos resampling
     resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
-    # Create a new white background image with proper orientation
+    # Create a new white background image
     final_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
     
     # Calculate position to center the image
@@ -237,11 +231,23 @@ def compress_image(image, max_width, max_height):
     # Paste the resized image onto the white background
     final_image.paste(resized_image, (x, y))
     
-    # Rotate the final image if in landscape mode
-    if current_orientation == ORIENTATION_LANDSCAPE:
-        final_image = final_image.rotate(90, expand=True)
-    
     return final_image
+
+def prepare_for_display(image, orientation):
+    """Prepare image for display by rotating if needed"""
+    # Create a mapping of orientations to rotation angles
+    rotations = {
+        ORIENTATION_0: 0,
+        ORIENTATION_90: 90,
+        ORIENTATION_180: 180,
+        ORIENTATION_270: 270
+    }
+    
+    # Get the rotation angle and rotate if needed
+    angle = rotations.get(orientation, 0)
+    if angle != 0:
+        return image.rotate(angle, expand=True)
+    return image
 
 @app.route('/')
 def index():
@@ -270,6 +276,9 @@ def upload():
                 # Open and process the image
                 image = Image.open(file)
                 
+                # Fix EXIF orientation during upload
+                image = fix_image_orientation(image)
+                
                 # Convert to RGB if necessary (handles PNG with transparency)
                 if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
                     background = Image.new('RGB', image.size, (255, 255, 255))
@@ -280,15 +289,18 @@ def upload():
                 elif image.mode != 'RGB':
                     image = image.convert('RGB')
                 
-                # Compress the image to frame dimensions
-                compressed_image = compress_image(image, display.width, display.height)
+                # Compress and resize the image
+                if current_orientation == ORIENTATION_90 or current_orientation == ORIENTATION_270:
+                    image = compress_image(image, display.height, display.width)
+                elif current_orientation == ORIENTATION_180:
+                    image = compress_image(image, display.width, display.height)
                 
                 # Generate filename and save path
                 filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 
-                # Save the compressed image with optimal quality
-                compressed_image.save(file_path, 'JPEG', quality=85, optimize=True)
+                # Save the compressed image
+                image.save(file_path, 'JPEG', quality=85, optimize=True)
                 logger.info(f"New photo uploaded and compressed: {filename}")
                 uploaded_files.append(filename)
                 
