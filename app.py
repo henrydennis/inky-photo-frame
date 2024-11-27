@@ -9,6 +9,7 @@ import shutil
 import logging
 from logging.handlers import RotatingFileHandler
 import traceback
+import RPi.GPIO as GPIO
 
 # Set up logging
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -171,10 +172,48 @@ def fix_image_orientation(image):
     
     return image
 
+# Initialize GPIO for buttons
+BUTTON_A = 5
+BUTTON_B = 6
+BUTTON_C = 16
+BUTTON_D = 24
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup([BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Global orientation state
+ORIENTATION_PORTRAIT = "portrait"
+ORIENTATION_LANDSCAPE = "landscape"
+current_orientation = ORIENTATION_PORTRAIT
+
+def handle_button(channel):
+    """Handle button presses for orientation changes"""
+    global current_orientation
+    try:
+        if channel in [BUTTON_A, BUTTON_B]:  # Use A or B button to toggle orientation
+            if current_orientation == ORIENTATION_PORTRAIT:
+                current_orientation = ORIENTATION_LANDSCAPE
+            else:
+                current_orientation = ORIENTATION_PORTRAIT
+            logger.info(f"Orientation changed to: {current_orientation}")
+            update_display()  # Update the display with new orientation
+    except Exception as e:
+        logger.error(f"Error handling button press: {e}")
+
+# Add button event detection
+GPIO.add_event_detect(BUTTON_A, GPIO.FALLING, callback=handle_button, bouncetime=250)
+GPIO.add_event_detect(BUTTON_B, GPIO.FALLING, callback=handle_button, bouncetime=250)
+
 def compress_image(image, max_width, max_height):
     """Compress and resize image to target dimensions while maintaining aspect ratio"""
+    global current_orientation
+    
     # Fix orientation first
     image = fix_image_orientation(image)
+    
+    # Swap dimensions if in landscape mode
+    if current_orientation == ORIENTATION_LANDSCAPE:
+        max_width, max_height = max_height, max_width
     
     # Calculate scaling ratios
     width_ratio = max_width / image.width
@@ -188,7 +227,7 @@ def compress_image(image, max_width, max_height):
     # Resize the image using high-quality Lanczos resampling
     resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
-    # Create a new white background image
+    # Create a new white background image with proper orientation
     final_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
     
     # Calculate position to center the image
@@ -197,6 +236,10 @@ def compress_image(image, max_width, max_height):
     
     # Paste the resized image onto the white background
     final_image.paste(resized_image, (x, y))
+    
+    # Rotate the final image if in landscape mode
+    if current_orientation == ORIENTATION_LANDSCAPE:
+        final_image = final_image.rotate(90, expand=True)
     
     return final_image
 
@@ -373,5 +416,8 @@ def delete_all_photos():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    logger.info("Starting Flask web server")
-    app.run(host='0.0.0.0', port=5000) 
+    try:
+        logger.info("Starting Flask web server")
+        app.run(host='0.0.0.0', port=5000)
+    finally:
+        GPIO.cleanup()  # Clean up GPIO on exit 
